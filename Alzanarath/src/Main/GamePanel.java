@@ -58,9 +58,7 @@ public class GamePanel extends JPanel implements Runnable{
 		
 		Graphics2D g2 = (Graphics2D)g;
 		
-		g2.setColor(Color.white);
-		
-		g2.fillRect(player.getPlayerX(), player.getPlayerY(), tileSize, tileSize);
+		player.draw(g2);
 		
 		g2.dispose();
 	}
@@ -105,5 +103,17 @@ public class GamePanel extends JPanel implements Runnable{
 		}
 		
 		
+	}
+
+	public int getTileSize() {
+		return tileSize;
+	}
+
+	public int getScreenWidth() {
+		return screenWidth;
+	}
+
+	public int getScreenHeight() {
+		return screenHeight;
 	}
 }

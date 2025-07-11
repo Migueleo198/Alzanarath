@@ -1,5 +1,5 @@
 csv index,imagePath,isCollision,isPlayerAbove
-0,/tiles/0wallTile.png,true,true
+0,/tiles/0wallTile.png,true,false
 1,,false,false
 2,/tiles/8WoodenFloor.png,true,true
 3,,false,false
@@ -10,5 +10,5 @@ csv index,imagePath,isCollision,isPlayerAbove
 8,,false,false
 9,/tiles/5Grass.png,false,false
 10,,false,false
-11,/tiles/7Tree.png,true,true
+11,/tiles/7Tree.png,true,false
 12,/tiles/8WoodenFloor.png,false,false

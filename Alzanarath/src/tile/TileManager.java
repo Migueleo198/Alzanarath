@@ -1,130 +1,176 @@
 package tile;
 
 import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-
+import java.util.ArrayList;
+import java.util.List;
 import javax.imageio.ImageIO;
-
 import Main.GamePanel;
 
 public class TileManager {
-	
-	GamePanel gp;
-	public Tile tile[];
-	
-	public int mapTileNum[][];
-	
-	
-	public TileManager(GamePanel gp){
-		
-		this.gp=gp;
-		tile = new Tile[10];
-		mapTileNum = new int[gp.maxWorldCol][gp.maxWorldRow];
-		
-		getTileImage();
-		loadMap();
-		
-	}
-	
-	public void getTileImage() {
-		
-		try {
-			
-			tile[0] = new Tile();
-			tile[0].image = ImageIO.read(getClass().getResourceAsStream("/tiles/5Grass.png"));
-			
-			
-			tile[1] = new Tile();
-			tile[1].image = ImageIO.read(getClass().getResourceAsStream("/tiles/7Tree.png"));
-			tile[1].setCollision(true);
-			
-			tile[2] = new Tile();
-			tile[2].image = ImageIO.read(getClass().getResourceAsStream("/tiles/0wallTile.png"));
-			tile[2].setCollision(true);
-			
-			tile[3] = new Tile();
-			tile[3].image = ImageIO.read(getClass().getResourceAsStream("/tiles/8WoodenFloor.png"));
-			
-			
-		}catch(IOException e){
-			e.printStackTrace();
-		}
-		
-	}
-	
-	public void loadMap() {
-		try {
-			InputStream is = getClass().getResourceAsStream("/Maps/map_with_houses_and_trees.txt");
-			
-			BufferedReader br = new BufferedReader(new InputStreamReader(is));
-			
-			int col = 0;
-			int row = 0;
-			
-			
-			while(col < gp.maxWorldCol && row < gp.maxWorldRow) {
-				String line = br.readLine();
-				
-				while(col < gp.maxWorldCol) {
-					String numbers[] = line.split(" ");
-					
-					int num = Integer.parseInt(numbers[col]);
-					
-					mapTileNum[col][row] = num;
-					col++;
-					
-					
-				}
-				
-				if(col == gp.maxWorldCol) {
-					col = 0;
-					row++;
-				}
-			}
-			br.close();
-			
-			
-		}catch(Exception e) {
-			e.printStackTrace();
-		}
-	}
-	
-	public void draw(Graphics2D g2) {
-		
-		int worldCol = 0;
-		int worldRow = 0;
-		
-		while(worldCol < gp.maxWorldCol && worldRow < gp.maxWorldRow) {
-			
-			int tileNum = mapTileNum[worldCol][worldRow];
-			
-			int worldX = worldCol * gp.getTileSize();
-			int worldY = worldRow * gp.getTileSize();
-			int screenX = worldX - gp.player.worldX + gp.player.screenX;
-			int screenY = worldY - gp.player.worldY + gp.player.screenY;
-			
-			if(worldX + gp.getTileSize() > gp.player.worldX - gp.player.screenX &&
-			   worldX - gp.getTileSize() < gp.player.worldX + gp.player.screenX &&
-			   worldY + gp.getTileSize() > gp.player.worldY - gp.player.screenY &&
-			   worldY - gp.getTileSize() < gp.player.worldY + gp.player.screenY) {
-				
-				g2.drawImage(tile[tileNum].image, screenX, screenY, gp.getTileSize(), gp.getTileSize(), null);
-				
-			}
-				
-			
-			worldCol++;
-			
-			
-			if(worldCol == gp.maxWorldCol) {
-				worldCol = 0;
-				worldRow+=1;
-			}
-			
-		}
-		
-	}
+    private GamePanel gp;
+    public Tile[] tile;
+    // [layer][col][row]
+    public int[][][] mapTileNum;
+    private final int numLayers = 3;
+
+    public TileManager(GamePanel gp) {
+        this.gp = gp;
+        loadTileConfig("/tiles/tileset.csv");      // loads and initializes tile[]
+        mapTileNum = new int[numLayers][gp.maxWorldCol][gp.maxWorldRow];
+        loadAllLayers("/Maps/map_output.txt");
+    }
+
+    /**
+     * Reads tileset.csv and builds the tile[] array dynamically.
+     * CSV columns: index,imagePath,isCollision,isPlayerAbove
+     * Blank paths result in no image but collision flags still respected.
+     * Images are loaded as BufferedImage and scaled to tile size.
+     */
+    private void loadTileConfig(String configPath) {
+        try (InputStream is = getClass().getResourceAsStream(configPath);
+             BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+            String line;
+            int maxIndex = -1;
+            List<CSVEntry> entries = new ArrayList<>();
+
+            br.readLine(); // Skip header line
+
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) continue;
+                String[] parts = line.split(",");
+                if (parts.length < 4) continue;
+
+                int idx = Integer.parseInt(parts[0].trim());
+                String path = parts[1].trim();
+                boolean coll = Boolean.parseBoolean(parts[2].trim());
+                boolean above = Boolean.parseBoolean(parts[3].trim());
+                entries.add(new CSVEntry(idx, path, coll, above));
+                if (idx > maxIndex) maxIndex = idx;
+            }
+
+            tile = new Tile[maxIndex + 1];
+
+            for (CSVEntry e : entries) {
+                Tile t = new Tile();
+                if (!e.path.isEmpty()) {
+                    try (InputStream imgStream = getClass().getResourceAsStream(e.path)) {
+                        BufferedImage raw = ImageIO.read(imgStream);
+                        if (raw != null) {
+                            BufferedImage scaled = new BufferedImage(gp.getTileSize(), gp.getTileSize(), BufferedImage.TYPE_INT_ARGB);
+                            Graphics2D g2 = scaled.createGraphics();
+                            g2.drawImage(raw, 0, 0, gp.getTileSize(), gp.getTileSize(), null);
+                            g2.dispose();
+                            t.image = scaled;
+                        }
+                    }
+                }
+                t.setCollision(e.coll);
+                t.setPlayerAbove(e.above);
+                tile[e.index] = t;
+            }
+
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+
+    private static class CSVEntry {
+        int index;
+        String path;
+        boolean coll;
+        boolean above;
+        CSVEntry(int i, String p, boolean c, boolean a) {
+            index = i; path = p; coll = c; above = a;
+        }
+    }
+
+    /**
+     * Loads all layers from a single file with sections marked by "# Layer N" headers.
+     */
+    public void loadAllLayers(String resourcePath) {
+        try (InputStream is = getClass().getResourceAsStream(resourcePath);
+             BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+
+            String line;
+            int currentLayer = -1;
+            int row = 0;
+
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) {
+                    // just skip blank separators
+                    continue;
+                }
+
+                if (line.startsWith("#")) {
+                    // new layer header
+                    // format: "# Layer N"
+                    String[] parts = line.split("\\s+");
+                    currentLayer = Integer.parseInt(parts[2]);
+                    row = 0;
+                    continue;
+                }
+
+                // only attempt to parse data once we've seen a header
+                if (currentLayer < 0 || currentLayer >= numLayers) {
+                    continue;
+                }
+
+                String[] nums = line.split("\\s+");
+                for (int col = 0; col < nums.length && col < gp.maxWorldCol; col++) {
+                    mapTileNum[currentLayer][col][row] = Integer.parseInt(nums[col]);
+                }
+                row++;
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    /** Draws all tiles below the player. */
+    public void drawBackground(Graphics2D g2) {
+        draw(g2, false);
+    }
+
+    /** Draws all tiles above the player. */
+    public void drawForeground(Graphics2D g2) {
+        draw(g2, true);
+    }
+
+    private void draw(Graphics2D g2, boolean drawAbove) {
+        for (int layer = 0; layer < numLayers; layer++) {
+            for (int row = 0; row < gp.maxWorldRow; row++) {
+                for (int col = 0; col < gp.maxWorldCol; col++) {
+                    int tNum = mapTileNum[layer][col][row];
+                    if (tNum < 0 || tNum >= tile.length) continue;
+                    Tile t = tile[tNum];
+                    if (t == null || t.isPlayerAbove() != drawAbove) continue;
+
+                    int worldX = col * gp.getTileSize();
+                    int worldY = row * gp.getTileSize();
+                    int screenX = worldX - gp.player.worldX + gp.player.screenX;
+                    int screenY = worldY - gp.player.worldY + gp.player.screenY;
+
+                    // cull off-screen
+                    if (worldX + gp.getTileSize() > gp.player.worldX - gp.player.screenX &&
+                        worldX - gp.getTileSize() < gp.player.worldX + gp.player.screenX &&
+                        worldY + gp.getTileSize() > gp.player.worldY - gp.player.screenY &&
+                        worldY - gp.getTileSize() < gp.player.worldY + gp.player.screenY) {
+
+                        g2.drawImage(t.image, screenX, screenY,
+                                     gp.getTileSize(), gp.getTileSize(), null);
+                    }
+                }
+            }
+        }
+    }
 }

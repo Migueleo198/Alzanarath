@@ -10,6 +10,7 @@ import javax.swing.JPanel;
 import entity.Player;
 import tile.TileManager;
 
+
 public class GamePanel extends JPanel implements Runnable{
 	
 	//SCREEN SETTINGS
@@ -40,8 +41,8 @@ public class GamePanel extends JPanel implements Runnable{
 	
 	
 	//WORLD SETTINGS
-	public final int maxWorldCol = 64;
-	public final int maxWorldRow = 60;
+	public final int maxWorldCol = 32;
+	public final int maxWorldRow = 32;
 	
 	public final int worldWidth = tileSize * maxWorldCol;
 	public final int worldHeight = tileSize * maxWorldRow;
@@ -88,9 +89,9 @@ public class GamePanel extends JPanel implements Runnable{
 		
 		Graphics2D g2 = (Graphics2D)g;
 		
-		tileM.draw(g2);
-		
+		tileM.drawBackground(g2);
 		player.draw(g2);
+		tileM.drawForeground(g2);
 		
 		
 		g2.dispose();

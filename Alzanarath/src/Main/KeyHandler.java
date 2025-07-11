@@ -7,6 +7,10 @@ public class KeyHandler implements KeyListener{
 
 	public boolean upPressed, downPressed, leftPressed, rightPressed;
 	
+	
+	public KeyHandler() {
+		
+	}
 	@Override
 	public void keyTyped(KeyEvent e) {
 		// TODO Auto-generated method stub

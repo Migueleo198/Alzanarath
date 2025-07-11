@@ -41,7 +41,7 @@ public class CollisionChecker {
                 entityTopRow = (entityTopWorldY - entity.speed) / gp.getTileSize();
                 tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityTopRow];
                 tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityTopRow];
-                if (gp.tileM.tile[tileNum1].isCollision() || gp.tileM.tile[tileNum2].isCollision()) {
+                if (gp.tileM.tile[tileNum1].isCollision() || gp.tileM.tile[tileNum2].isCollision() && overlap > 55) {
                     entity.collisionOn = true;
                 }
                 break;

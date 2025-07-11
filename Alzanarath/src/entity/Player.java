@@ -10,9 +10,17 @@ import javax.imageio.ImageIO;
 import Main.GamePanel;
 
 public class Player extends Entity{
+	private boolean isHiddenBehindObject = false;
+
+	private boolean applyVerticalOffset = false;
+	private String lastDirection = "down"; // initialize to default
+
 	
+	//CHECK LAST POSITION
+	public boolean isDownLast;
+
 	
-	
+
 	private GamePanel gp;
 	
 	public final int screenX;
@@ -46,120 +54,112 @@ public class Player extends Entity{
 	}
 	
 	public void update() {
-		
-		if(gp.keyH.upPressed == true || gp.keyH.downPressed == true 
-				|| gp.keyH.rightPressed == true || gp.keyH.leftPressed == true) {
-			
-			
-			if(gp.keyH.upPressed == true) {
-				direction = "up";
-				
-			}
-			
-			else if(gp.keyH.downPressed == true) {
-				direction = "down";
-				
-			}
-			
-			else if(gp.keyH.rightPressed == true) {
-				direction = "right";
-				
-			}
-			
-			else if(gp.keyH.leftPressed == true) {
-				direction = "left";
-				
-			}
-			
-			
-			//CHECK TILE COLLISION
-			collisionOn = false;
-			gp.cChecker.checkTile(this);
-			
-			
-			//IF COLLISION IS FALSE, PLAYER CAN MOVE
-			
-			if(collisionOn == false) {
-				
-				switch(direction) {
-				case "up":
-					worldY -= speed;
-					break;
-				case "down":
-					worldY += speed;
-					break;
-				case "right":
-					worldX += speed;
-					break;
-				case "left":
-					worldX -= speed;
-					break;
-				}
-				
-			}
-			
-			spriteCounter++;
-			
-			if(spriteCounter >  12) {
-				if(spriteNum == 1) {
-					spriteNum = 2;
-				}
-				else if (spriteNum == 2) {
-					spriteNum = 1;
-				}
-				
-				
-				spriteCounter = 0;
-			}
-			
-			
-		}
-		
-		
+	    boolean moved = false;
+
+	    if (gp.keyH.upPressed) {
+	        direction = "up";
+	        moved = true;
+	    } else if (gp.keyH.downPressed) {
+	        direction = "down";
+	        moved = true;
+	    } else if (gp.keyH.rightPressed) {
+	        direction = "right";
+	        moved = true;
+	    } else if (gp.keyH.leftPressed) {
+	        direction = "left";
+	        moved = true;
+	    }
+
+	    if (moved) {
+	        lastDirection = direction;
+
+	        collisionOn = false;
+	        gp.cChecker.checkTile(this);
+
+	        if (!collisionOn) {
+	            switch(direction) {
+	                case "up" -> worldY -= speed;
+	                case "down" -> worldY += speed;
+	                case "left" -> worldX -= speed;
+	                case "right" -> worldX += speed;
+	            }
+	        }
+
+	        spriteCounter++;
+	        if (spriteCounter > 12) {
+	            spriteNum = (spriteNum == 1) ? 2 : 1;
+	            spriteCounter = 0;
+	        }
+	    }
 	}
+
 	
-	public void draw(Graphics2D g2) {
-		
-		
-		BufferedImage image = null;
-		
-		switch(direction) {
-		case "up": 
-			if(spriteNum==1) {
-			image = up1;
-			}
-			if(spriteNum == 2) {
-			image = up2;
-			}
-			break;
-		case "down":
-			if(spriteNum==1) {
-			image = down1;
-			}
-			if(spriteNum == 2) {
-			image = down2;
-			}
-			break;
-		case "left":
-			if(spriteNum==1) {
-			image = left1;
-			}
-			if(spriteNum == 2) {
-			image = left2;
-			}
-			break;
-		case "right":
-			if(spriteNum==1) {
-			image = right1;
-			}
-			if(spriteNum == 2) {
-			image = right2;
-			}
-			break;
-		}
-		
-		g2.drawImage(image, screenX, screenY, gp.getTileSize(),gp.getTileSize(),null);
+	
+
+	public void updateVerticalOffset() {
+	    // Example logic:
+	    if ("down".equals(direction)) {
+	        applyVerticalOffset = true;
+	    } else if (("left".equals(direction) || "right".equals(direction)) && applyVerticalOffset) {
+	        // keep offset as true if previously applied
+	    } else {
+	        applyVerticalOffset = false;
+	    }
 	}
+
+	
+	
+
+	private int verticalOffset = 0;  // move this to instance variable
+
+	public void draw(Graphics2D g2) {
+	    BufferedImage image = null;
+
+	    switch (direction) {
+	        case "up" -> image = (spriteNum == 1) ? up1 : up2;
+	        case "down" -> image = (spriteNum == 1) ? down1 : down2;
+	        case "left" -> image = (spriteNum == 1) ? left1 : left2;
+	        case "right" -> image = (spriteNum == 1) ? right1 : right2;
+	    }
+
+	    boolean behindObject = gp.cChecker.isPlayerBehindObject(direction);
+
+	    int targetOffset = 0;
+	    if (behindObject && "down".equals(direction)) {
+	        targetOffset = 20;
+	    }
+
+	    // Smoothly move verticalOffset toward targetOffset
+	    if (verticalOffset < targetOffset) {
+	        verticalOffset += 2.5;  // speed of transition, tweak as needed
+	        if (verticalOffset > targetOffset) verticalOffset = targetOffset;
+	    } else if (verticalOffset > targetOffset) {
+	        verticalOffset -= 2;
+	        if (verticalOffset < targetOffset) verticalOffset = targetOffset;
+	    }
+
+	    g2.drawImage(image, screenX, screenY + verticalOffset, gp.getTileSize(), gp.getTileSize(), null);
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	
 	public void getPlayerImage() {
 		try {
@@ -188,18 +188,19 @@ public class Player extends Entity{
 	}
 
 	public int getPlayerY() {
-		return worldX;
+	    return worldY;  // <-- was worldX
 	}
 
 	public void setPlayerY(int y) {
-		this.worldY = y;
+	    this.worldY = y;
 	}
 
 	public int getPlayerX() {
-		return worldX;
+	    return worldX;  // <-- was worldX but your setter below sets worldY by mistake
 	}
 
 	public void setPlayerX(int x) {
-		this.worldY = x;
+	    this.worldX = x;  // <-- Fix this. It was setting worldY mistakenly.
 	}
+
 }

@@ -1,6 +1,7 @@
 package Main;
 
 import entity.Entity;
+import java.awt.Rectangle;
 
 public class CollisionChecker {
     private GamePanel gp;
@@ -11,97 +12,123 @@ public class CollisionChecker {
         this.numLayers = gp.tileM.mapTileNum.length;
     }
 
-    /**
-     * Position solidArea relative to world coordinates using default offsets.
-     */
     private void updateSolidArea(Entity entity) {
         entity.solidArea.x = entity.worldX + entity.solidAreaDefaultX;
         entity.solidArea.y = entity.worldY + entity.solidAreaDefaultY;
     }
 
-    /**
-     * Reset solidArea to its default offsets.
-     */
     private void resetSolidArea(Entity entity) {
         entity.solidArea.x = entity.solidAreaDefaultX;
         entity.solidArea.y = entity.solidAreaDefaultY;
     }
 
-    /**
-     * Check collisions between an entity and map tiles across all layers.
-     */
     public void checkTile(Entity entity) {
         entity.collisionOn = false;
         updateSolidArea(entity);
+        
+        
+        
 
-        // Predict entity bounds after movement
-        int futureLeftX   = entity.solidArea.x + (entity.direction.equals("left")  ? -entity.speed : entity.direction.equals("right") ? entity.speed : 0);
-        int futureRightX  = futureLeftX + entity.solidArea.width;
-        int futureTopY    = entity.solidArea.y + (entity.direction.equals("up")    ? -entity.speed : entity.direction.equals("down")  ? entity.speed : 0);
-        int futureBottomY = futureTopY + entity.solidArea.height;
+        // Predict future solid area based on movement
+        Rectangle futureArea = new Rectangle(entity.solidArea);
+        
+        
 
-        // Convert to tile indices
-        int leftCol   = futureLeftX   / gp.getTileSize();
-        int rightCol  = futureRightX  / gp.getTileSize();
-        int topRow    = futureTopY    / gp.getTileSize();
-        int bottomRow = futureBottomY / gp.getTileSize();
+        switch (entity.direction) {
+            case "up" -> futureArea.y -= entity.speed;
+            case "down" -> futureArea.y += entity.speed ;
+            case "left" -> futureArea.x -= entity.speed;
+            case "right" -> futureArea.x += entity.speed;
+        }
+        
+        
 
-        // For each layer, check the relevant tiles
+        int tileSize = gp.getTileSize();
+        int leftCol   = futureArea.x / tileSize;
+        int rightCol  = (futureArea.x + futureArea.width) / tileSize;
+        int topRow    = futureArea.y / tileSize;
+        int bottomRow = (futureArea.y + futureArea.height) / tileSize;
+
         for (int layer = 0; layer < numLayers; layer++) {
-            int[][] layerMap = gp.tileM.mapTileNum[layer];
+            int[][] map = gp.tileM.mapTileNum[layer];
+
+            // Clamp indices
+            leftCol = clamp(leftCol, 0, map.length - 1);
+            rightCol = clamp(rightCol, 0, map.length - 1);
+            topRow = clamp(topRow, 0, map[0].length - 1);
+            bottomRow = clamp(bottomRow, 0, map[0].length - 1);
+
+            int tileNum1, tileNum2;
 
             switch (entity.direction) {
-                case "up": {
-                    int tileNum1 = layerMap[leftCol][topRow];
-                    int tileNum2 = layerMap[rightCol][topRow];
-                    if (isCollisionTile(tileNum1) || isCollisionTile(tileNum2)) {
-                        entity.collisionOn = true;
-                    }
-                    break;
-                }
-                case "down": {
-                    int tileNum1 = layerMap[leftCol][bottomRow];
-                    int tileNum2 = layerMap[rightCol][bottomRow];
-                    if (isCollisionTile(tileNum1) || isCollisionTile(tileNum2)) {
-                        entity.collisionOn = true;
-                    }
-                    break;
-                }
-                case "left": {
-                    int tileNum1 = layerMap[leftCol][topRow];
-                    int tileNum2 = layerMap[leftCol][bottomRow];
-                    if (isCollisionTile(tileNum1) || isCollisionTile(tileNum2)) {
-                        entity.collisionOn = true;
-                    }
-                    break;
-                }
-                case "right": {
-                    int tileNum1 = layerMap[rightCol][topRow];
-                    int tileNum2 = layerMap[rightCol][bottomRow];
-                    if (isCollisionTile(tileNum1) || isCollisionTile(tileNum2)) {
-                        entity.collisionOn = true;
-                    }
-                    break;
-                }
+            case "up":
+                tileNum1 = map[leftCol][topRow];
+                tileNum2 = map[rightCol][topRow];
+                break;
+            case "down":
+                tileNum1 = map[leftCol][bottomRow];
+                tileNum2 = map[rightCol][bottomRow];
+                break;
+            case "left":
+                tileNum1 = map[leftCol][topRow];
+                tileNum2 = map[leftCol][bottomRow];
+                break;
+            case "right":
+                tileNum1 = map[rightCol][topRow];
+                tileNum2 = map[rightCol][bottomRow];
+                break;
+            default:
+                continue; // This is now valid
+        }
+
+
+            if (isCollisionTile(tileNum1) || isCollisionTile(tileNum2)) {
+                entity.collisionOn = true;
+                break;
             }
-            if (entity.collisionOn) break;
         }
 
         resetSolidArea(entity);
     }
 
-    /**
-     * Utility to guard against invalid indices and check tile collision flag.
-     */
     private boolean isCollisionTile(int tileNum) {
-        if (tileNum < 0 || tileNum >= gp.tileM.tile.length) return false;
-        return gp.tileM.tile[tileNum] != null && gp.tileM.tile[tileNum].isCollision();
+        return tileNum >= 0 && tileNum < gp.tileM.tiles.length &&
+               gp.tileM.tiles[tileNum] != null &&
+               gp.tileM.tiles[tileNum].isCollision();
+    }
+    
+    public boolean isPlayerBehindObject(String direction) {
+        int tileSize = gp.getTileSize();
+
+        int solidLeft = gp.player.worldX + gp.player.solidArea.x;
+        int solidTop = gp.player.worldY + gp.player.solidArea.y;
+
+        int playerTileX = (solidLeft + gp.player.solidArea.width / 2) / tileSize;
+        int playerTileY = (solidTop + gp.player.solidArea.height / 2) / tileSize;
+
+        int checkTileX = playerTileX;
+        int checkTileY = playerTileY;
+
+        switch (direction) {
+            case "up" -> checkTileY = playerTileY - 1;
+            case "down" -> checkTileY = playerTileY + 1;
+            case "left" -> checkTileX = playerTileX - 1;
+            case "right" -> checkTileX = playerTileX + 1;
+        }
+
+        // Returns true if near obstacle tiles, false otherwise
+        return gp.tileM.isNearCollisionTile();
     }
 
-    /**
-     * Check whether this entity would collide with the player on movement.
-     * Resets the solidAreas after checking.
-     */
+
+
+
+
+
+
+
+
+
     public boolean checkPlayer(Entity entity) {
         boolean contactPlayer = false;
         if (gp.player == null) return false;
@@ -109,21 +136,28 @@ public class CollisionChecker {
         updateSolidArea(entity);
         updateSolidArea(gp.player);
 
-        // Move entity's solidArea to future position
+        Rectangle futureArea = new Rectangle(entity.solidArea);
+
         switch (entity.direction) {
-            case "up":    entity.solidArea.y -= entity.speed; break;
-            case "down":  entity.solidArea.y += entity.speed; break;
-            case "left":  entity.solidArea.x -= entity.speed; break;
-            case "right": entity.solidArea.x += entity.speed; break;
+            case "up" -> futureArea.y -= entity.speed;
+            case "down" -> futureArea.y += entity.speed;
+            case "left" -> futureArea.x -= entity.speed;
+            case "right" -> futureArea.x += entity.speed;
         }
 
-        if (entity.solidArea.intersects(gp.player.solidArea)) {
+        if (futureArea.intersects(gp.player.solidArea)) {
             entity.collisionOn = true;
             contactPlayer = true;
         }
 
         resetSolidArea(entity);
         resetSolidArea(gp.player);
+
         return contactPlayer;
     }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
 }
+

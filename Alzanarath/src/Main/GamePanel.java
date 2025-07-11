@@ -7,11 +7,20 @@ import java.awt.Graphics2D;
 
 import javax.swing.JPanel;
 
+import entity.Entity;
 import entity.Player;
 import tile.TileManager;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+
+
 
 public class GamePanel extends JPanel implements Runnable{
+	
+	
+
 	
 	//SCREEN SETTINGS
 	
@@ -55,6 +64,9 @@ public class GamePanel extends JPanel implements Runnable{
 	
 	private int FPS = 60;
 	
+	public ArrayList<Entity> drawEntities = new ArrayList<>();
+
+	
 	//SOUND AND MUSIC
 	Sound sound = new Sound();
 	
@@ -89,9 +101,7 @@ public class GamePanel extends JPanel implements Runnable{
 		
 		Graphics2D g2 = (Graphics2D)g;
 		
-		tileM.drawBackground(g2);
-		player.draw(g2);
-		tileM.drawForeground(g2);
+		tileM.drawLayered(g2);
 		
 		
 		g2.dispose();

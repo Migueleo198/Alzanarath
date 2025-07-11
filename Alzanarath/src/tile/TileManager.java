@@ -1,6 +1,7 @@
 package tile;
 
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -13,7 +14,7 @@ import Main.GamePanel;
 
 public class TileManager {
     private GamePanel gp;
-    public Tile[] tile;
+    public Tile[] tiles;
     // [layer][col][row]
     public int[][][] mapTileNum;
     private final int numLayers = 3;
@@ -54,7 +55,7 @@ public class TileManager {
                 if (idx > maxIndex) maxIndex = idx;
             }
 
-            tile = new Tile[maxIndex + 1];
+            tiles = new Tile[maxIndex + 1];
 
             for (CSVEntry e : entries) {
                 Tile t = new Tile();
@@ -72,7 +73,7 @@ public class TileManager {
                 }
                 t.setCollision(e.coll);
                 t.setPlayerAbove(e.above);
-                tile[e.index] = t;
+                tiles[e.index] = t;
             }
 
         } catch (IOException ex) {
@@ -134,25 +135,139 @@ public class TileManager {
             e.printStackTrace();
         }
     }
+    
+    /**
+     * Checks if the given tile or its immediate neighbors contain any obstacle/collision tiles.
+     * Returns true if any collision tiles are found nearby, otherwise false.
+     */
+    public boolean isNearCollisionTile() {
+        int tileSize = gp.getTileSize();
+        int margin = tileSize / 2;
 
+        Rectangle playerRect = new Rectangle(
+            gp.player.worldX + gp.player.solidArea.x - margin,
+            gp.player.worldY + gp.player.solidArea.y - margin,
+            gp.player.solidArea.width + margin * 2,
+            gp.player.solidArea.height + margin * 2
+        );
 
-    /** Draws all tiles below the player. */
-    public void drawBackground(Graphics2D g2) {
-        draw(g2, false);
+        int leftTile = Math.max(0, playerRect.x / tileSize);
+        int rightTile = Math.min(gp.maxWorldCol - 1, (playerRect.x + playerRect.width) / tileSize);
+        int topTile = Math.max(0, playerRect.y / tileSize);
+        int bottomTile = Math.min(gp.maxWorldRow - 1, (playerRect.y + playerRect.height) / tileSize);
+
+        for (int col = leftTile; col <= rightTile; col++) {
+            for (int row = topTile; row <= bottomTile; row++) {
+                for (int layer = 0; layer < numLayers; layer++) {
+                    int tileNum = mapTileNum[layer][col][row];
+                    if (tileNum < 0 || tileNum >= tiles.length) continue;
+
+                    Tile tile = tiles[tileNum];
+                    if (tile != null && tile.isCollision()) {
+                        Rectangle tileRect = new Rectangle(col * tileSize, row * tileSize, tileSize, tileSize);
+                        if (playerRect.intersects(tileRect)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
-    /** Draws all tiles above the player. */
-    public void drawForeground(Graphics2D g2) {
-        draw(g2, true);
+
+
+
+
+
+
+
+    public void drawLayered(Graphics2D g2) {
+        int tileSize = gp.getTileSize();
+        int playerRow = gp.player.worldY / tileSize;
+
+        // Draw layer 0 fully (always below player)
+        for (int row = 0; row < gp.maxWorldRow; row++) {
+            for (int col = 0; col < gp.maxWorldCol; col++) {
+                int tNum = mapTileNum[0][col][row];
+                if (tNum < 0 || tNum >= tiles.length) continue;
+                Tile t = tiles[tNum];
+                if (t == null) continue;
+
+                int worldX = col * tileSize;
+                int worldY = row * tileSize;
+                int screenX = worldX - gp.player.worldX + gp.player.screenX;
+                int screenY = worldY - gp.player.worldY + gp.player.screenY;
+
+                if (isOnScreen(worldX, worldY)) {
+                    g2.drawImage(t.image, screenX, screenY, tileSize, tileSize, null);
+                }
+            }
+        }
+
+        // Now draw layers 1 and above with player layered by Y position
+        for (int row = 0; row < gp.maxWorldRow; row++) {
+            // First draw tiles from layers 1+ that are above the player vertically (worldY < player.worldY)
+            for (int layer = 1; layer < numLayers; layer++) {
+                for (int col = 0; col < gp.maxWorldCol; col++) {
+                    int tNum = mapTileNum[layer][col][row];
+                    if (tNum < 0 || tNum >= tiles.length) continue;
+                    Tile t = tiles[tNum];
+                    if (t == null) continue;
+
+                    int worldX = col * tileSize;
+                    int worldY = row * tileSize;
+                    int screenX = worldX - gp.player.worldX + gp.player.screenX;
+                    int screenY = worldY - gp.player.worldY + gp.player.screenY;
+
+                    if (isOnScreen(worldX, worldY) && worldY < gp.player.worldY) {
+                        g2.drawImage(t.image, screenX, screenY, tileSize, tileSize, null);
+                    }
+                }
+            }
+
+            // Draw player on their current row
+            if (row == playerRow) {
+                gp.player.draw(g2);
+            }
+
+            // Now draw tiles from layers 1+ that are below or equal to the player vertically (worldY >= player.worldY)
+            for (int layer = 1; layer < numLayers; layer++) {
+                for (int col = 0; col < gp.maxWorldCol; col++) {
+                    int tNum = mapTileNum[layer][col][row];
+                    if (tNum < 0 || tNum >= tiles.length) continue;
+                    Tile t = tiles[tNum];
+                    if (t == null) continue;
+
+                    int worldX = col * tileSize;
+                    int worldY = row * tileSize;
+                    int screenX = worldX - gp.player.worldX + gp.player.screenX;
+                    int screenY = worldY - gp.player.worldY + gp.player.screenY;
+
+                    if (isOnScreen(worldX, worldY) && worldY >= gp.player.worldY) {
+                        g2.drawImage(t.image, screenX, screenY, tileSize, tileSize, null);
+                    }
+                }
+            }
+        }
     }
+
+    private boolean isOnScreen(int worldX, int worldY) {
+        return worldX + gp.getTileSize() > gp.player.worldX - gp.player.screenX &&
+               worldX - gp.getTileSize() < gp.player.worldX + gp.player.screenX &&
+               worldY + gp.getTileSize() > gp.player.worldY - gp.player.screenY &&
+               worldY - gp.getTileSize() < gp.player.worldY + gp.player.screenY;
+    }
+
 
     private void draw(Graphics2D g2, boolean drawAbove) {
         for (int layer = 0; layer < numLayers; layer++) {
             for (int row = 0; row < gp.maxWorldRow; row++) {
                 for (int col = 0; col < gp.maxWorldCol; col++) {
                     int tNum = mapTileNum[layer][col][row];
-                    if (tNum < 0 || tNum >= tile.length) continue;
-                    Tile t = tile[tNum];
+                    if (tNum < 0 || tNum >= tiles.length) continue;
+                    Tile t = tiles[tNum];
                     if (t == null || t.isPlayerAbove() != drawAbove) continue;
 
                     int worldX = col * gp.getTileSize();

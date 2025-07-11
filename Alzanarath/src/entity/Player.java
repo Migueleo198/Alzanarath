@@ -4,203 +4,192 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-
 import javax.imageio.ImageIO;
-
 import Main.GamePanel;
 
-public class Player extends Entity{
-	private boolean isHiddenBehindObject = false;
+public class Player extends Entity {
+    private boolean isHiddenBehindObject = false;
+    private boolean applyVerticalOffset = false;
+    private String lastDirection = "down";
+    public boolean isDownLast;
+    
+    private GamePanel gp;
+    public final int screenX;
+    public final int screenY;
+    
+    // Network multiplayer properties
+    private String playerId;
+    private boolean isLocalPlayer;
+    private int verticalOffset = 0;
+    
+    // Animation sprites
+    private BufferedImage up1, up2, down1, down2, left1, left2, right1, right2;
 
-	private boolean applyVerticalOffset = false;
-	private String lastDirection = "down"; // initialize to default
+    public Player(GamePanel gp) {
+        this.gp = gp;
+        
+        // Center player on screen
+        screenX = gp.getScreenWidth()/2 - (gp.getTileSize()/2);
+        screenY = gp.getScreenHeight()/2 - (gp.getTileSize()/2);
+        
+        // Set collision box
+        solidAreaDefaultX = 8;
+        solidAreaDefaultY = 16;
+        solidArea = new Rectangle(8, 16, 32, 32);
+        
+        setDefaultValues();
+        getPlayerImage();
+    }
 
-	
-	//CHECK LAST POSITION
-	public boolean isDownLast;
+    // Network multiplayer methods
+    public String getPlayerId() {
+        return playerId;
+    }
 
-	
+    public void setPlayerId(String playerId) {
+        this.playerId = playerId;
+    }
 
-	private GamePanel gp;
-	
-	public final int screenX;
-	public final int screenY;
-	
-	
-	public Player(GamePanel gp) {
-		this.gp = gp;
-		
-		screenX = gp.getScreenWidth()/2 - (gp.getTileSize()/2);
-		screenY = gp.getScreenHeight()/2 - (gp.getTileSize()/2);
-		
-		solidAreaDefaultX = 8;
-		solidAreaDefaultY = 16;
-		
-		solidArea = new Rectangle();
-		solidArea.x = 8;
-		solidArea.y = 16;
-		solidArea.width = 32;
-		solidArea.height = 32;
-		
-		setDefaultValues();
-		getPlayerImage();
-	}
-	
-	public void setDefaultValues() {
-		this.worldX = gp.getTileSize() * 23;
-		this.worldY = gp.getTileSize() * 21;
-		this.speed = 4;
-		this.direction = "down";
-	}
-	
-	public void update() {
-	    boolean moved = false;
+    public boolean isLocalPlayer() {
+        return isLocalPlayer;
+    }
 
-	    if (gp.keyH.upPressed) {
-	        direction = "up";
-	        moved = true;
-	    } else if (gp.keyH.downPressed) {
-	        direction = "down";
-	        moved = true;
-	    } else if (gp.keyH.rightPressed) {
-	        direction = "right";
-	        moved = true;
-	    } else if (gp.keyH.leftPressed) {
-	        direction = "left";
-	        moved = true;
-	    }
+    public void setLocalPlayer(boolean localPlayer) {
+        isLocalPlayer = localPlayer;
+    }
 
-	    if (moved) {
-	        lastDirection = direction;
+    public void setDefaultValues() {
+        this.worldX = gp.getTileSize() * 23;
+        this.worldY = gp.getTileSize() * 21;
+        this.speed = 4;
+        this.direction = "down";
+    }
 
-	        collisionOn = false;
-	        gp.cChecker.checkTile(this);
+    public void update() {
+        if (isLocalPlayer) {
+            // Only process input for local player
+            boolean moved = false;
 
-	        if (!collisionOn) {
-	            switch(direction) {
-	                case "up" -> worldY -= speed;
-	                case "down" -> worldY += speed;
-	                case "left" -> worldX -= speed;
-	                case "right" -> worldX += speed;
-	            }
-	        }
+            if (gp.keyH.upPressed) {
+                direction = "up";
+                moved = true;
+            } else if (gp.keyH.downPressed) {
+                direction = "down";
+                moved = true;
+            } else if (gp.keyH.rightPressed) {
+                direction = "right";
+                moved = true;
+            } else if (gp.keyH.leftPressed) {
+                direction = "left";
+                moved = true;
+            }
 
-	        spriteCounter++;
-	        if (spriteCounter > 12) {
-	            spriteNum = (spriteNum == 1) ? 2 : 1;
-	            spriteCounter = 0;
-	        }
-	    }
-	}
+            if (moved) {
+                lastDirection = direction;
+                collisionOn = false;
+                gp.cChecker.checkTile(this);
 
-	
-	
+                if (!collisionOn) {
+                    switch(direction) {
+                        case "up" -> worldY -= speed;
+                        case "down" -> worldY += speed;
+                        case "left" -> worldX -= speed;
+                        case "right" -> worldX += speed;
+                    }
+                }
 
-	public void updateVerticalOffset() {
-	    // Example logic:
-	    if ("down".equals(direction)) {
-	        applyVerticalOffset = true;
-	    } else if (("left".equals(direction) || "right".equals(direction)) && applyVerticalOffset) {
-	        // keep offset as true if previously applied
-	    } else {
-	        applyVerticalOffset = false;
-	    }
-	}
+                spriteCounter++;
+                if (spriteCounter > 12) {
+                    spriteNum = (spriteNum == 1) ? 2 : 1;
+                    spriteCounter = 0;
+                }
+            }
+        }
+        
+        // Update vertical offset for hiding behind objects
+        updateVerticalOffset();
+    }
 
-	
-	
+    private void updateVerticalOffset() {
+        if ("down".equals(direction)) {
+            applyVerticalOffset = true;
+        } else if (("left".equals(direction) || "right".equals(direction)) && applyVerticalOffset) {
+            // keep offset if previously applied
+        } else {
+            applyVerticalOffset = false;
+        }
 
-	private int verticalOffset = 0;  // move this to instance variable
+        // Smooth offset transition
+        int targetOffset = (applyVerticalOffset && gp.cChecker.isPlayerBehindObject(direction)) ? 20 : 0;
+        
+        if (verticalOffset < targetOffset) {
+            verticalOffset += 2;
+            if (verticalOffset > targetOffset) verticalOffset = targetOffset;
+        } else if (verticalOffset > targetOffset) {
+            verticalOffset -= 2;
+            if (verticalOffset < targetOffset) verticalOffset = targetOffset;
+        }
+    }
 
-	public void draw(Graphics2D g2) {
-	    BufferedImage image = null;
+    public void draw(Graphics2D g2) {
+        BufferedImage image = getCurrentImage();
+        int drawY = screenY + verticalOffset;
+        
+        // For remote players, calculate screen position based on world coordinates
+        if (!isLocalPlayer) {
+            drawY = gp.worldYToScreenY(worldY) + verticalOffset;
+        }
+        
+        g2.drawImage(image, screenX, drawY, gp.getTileSize(), gp.getTileSize(), null);
+    }
 
-	    switch (direction) {
-	        case "up" -> image = (spriteNum == 1) ? up1 : up2;
-	        case "down" -> image = (spriteNum == 1) ? down1 : down2;
-	        case "left" -> image = (spriteNum == 1) ? left1 : left2;
-	        case "right" -> image = (spriteNum == 1) ? right1 : right2;
-	    }
+    public BufferedImage getCurrentImage() {
+        return switch (direction) {
+            case "up" -> (spriteNum == 1) ? up1 : up2;
+            case "down" -> (spriteNum == 1) ? down1 : down2;
+            case "left" -> (spriteNum == 1) ? left1 : left2;
+            case "right" -> (spriteNum == 1) ? right1 : right2;
+            default -> down1;
+        };
+    }
 
-	    boolean behindObject = gp.cChecker.isPlayerBehindObject(direction);
+    public void getPlayerImage() {
+        try {
+            up1 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(up).png"));
+            up2 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(up2).png"));
+            down1 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(down).png"));
+            down2 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(down2).png"));
+            right1 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(right).png"));
+            right2 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(right2).png"));
+            left1 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(left).png"));
+            left2 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(left2).png"));
+        } catch(IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-	    int targetOffset = 0;
-	    if (behindObject && "down".equals(direction)) {
-	        targetOffset = 20;
-	    }
+    // Getters and setters
+    public int getPlayerSpeed() {
+        return speed;
+    }
 
-	    // Smoothly move verticalOffset toward targetOffset
-	    if (verticalOffset < targetOffset) {
-	        verticalOffset += 2.5;  // speed of transition, tweak as needed
-	        if (verticalOffset > targetOffset) verticalOffset = targetOffset;
-	    } else if (verticalOffset > targetOffset) {
-	        verticalOffset -= 2;
-	        if (verticalOffset < targetOffset) verticalOffset = targetOffset;
-	    }
+    public void setPlayerSpeed(int speed) {
+        this.speed = speed;
+    }
 
-	    g2.drawImage(image, screenX, screenY + verticalOffset, gp.getTileSize(), gp.getTileSize(), null);
-	}
+    public int getPlayerY() {
+        return worldY;
+    }
 
+    public void setPlayerY(int y) {
+        this.worldY = y;
+    }
 
+    public int getPlayerX() {
+        return worldX;
+    }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	
-	public void getPlayerImage() {
-		try {
-			
-			up1 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(up).png"));
-			up2 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(up2).png"));
-			down1 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(down).png"));
-			down2 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(down2).png"));
-			right1 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(right).png"));
-			right2 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(right2).png"));
-			left1 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(left).png"));
-			left2 = ImageIO.read(getClass().getResourceAsStream("/Player/SpritesJava(left2).png"));
-			
-		}catch(IOException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	
-	public int getPlayerSpeed() {
-		return speed;
-	}
-
-	public void setPlayerSpeed(int playerSpeed) {
-		this.speed = playerSpeed;
-	}
-
-	public int getPlayerY() {
-	    return worldY;  // <-- was worldX
-	}
-
-	public void setPlayerY(int y) {
-	    this.worldY = y;
-	}
-
-	public int getPlayerX() {
-	    return worldX;  // <-- was worldX but your setter below sets worldY by mistake
-	}
-
-	public void setPlayerX(int x) {
-	    this.worldX = x;  // <-- Fix this. It was setting worldY mistakenly.
-	}
-
+    public void setPlayerX(int x) {
+        this.worldX = x;
+    }
 }

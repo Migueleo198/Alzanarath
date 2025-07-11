@@ -14,12 +14,10 @@ public class TileManager {
 	
 	GamePanel gp;
 	public Tile tile[];
-	
 	public int mapTileNum[][];
 	
 	
 	public TileManager(GamePanel gp){
-		
 		this.gp=gp;
 		tile = new Tile[10];
 		mapTileNum = new int[gp.maxWorldCol][gp.maxWorldRow];
@@ -30,30 +28,32 @@ public class TileManager {
 	}
 	
 	public void getTileImage() {
-		
-		try {
-			
-			tile[0] = new Tile();
-			tile[0].image = ImageIO.read(getClass().getResourceAsStream("/tiles/5Grass.png"));
-			
-			
-			tile[1] = new Tile();
-			tile[1].image = ImageIO.read(getClass().getResourceAsStream("/tiles/7Tree.png"));
-			tile[1].setCollision(true);
-			
-			tile[2] = new Tile();
-			tile[2].image = ImageIO.read(getClass().getResourceAsStream("/tiles/0wallTile.png"));
-			tile[2].setCollision(true);
-			
-			tile[3] = new Tile();
-			tile[3].image = ImageIO.read(getClass().getResourceAsStream("/tiles/8WoodenFloor.png"));
-			
-			
-		}catch(IOException e){
-			e.printStackTrace();
-		}
-		
+	    try (InputStream is = getClass().getResourceAsStream("/tiles/tileset.csv");
+	         BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+
+	        String line;
+
+	        while ((line = br.readLine()) != null) {
+	            line = line.trim();
+	            if (line.isEmpty() || line.startsWith("index")) continue;
+
+	            String[] parts = line.split(",");
+	            
+	            int index = Integer.parseInt(parts[0].trim());
+	            String pathImage = parts[1].trim();
+	            boolean isCollision = Boolean.parseBoolean(parts[2].trim().toLowerCase());
+	            boolean isPlayerAbove = Boolean.parseBoolean(parts[3].trim().toLowerCase());
+
+	            tile[index] = new Tile();
+	            tile[index].image = ImageIO.read(getClass().getResourceAsStream(pathImage));
+	            tile[index].setCollision(isCollision);
+	            tile[index].setPlayerAbove(isPlayerAbove);
+	        }
+	    } catch (IOException e) {
+	        e.printStackTrace();
+	    }
 	}
+
 	
 	public void loadMap() {
 		try {
@@ -92,7 +92,15 @@ public class TileManager {
 		}
 	}
 	
-	public void draw(Graphics2D g2) {
+	public void drawBackground(Graphics2D g2) {
+	    draw(g2, false); // Draw all tiles BELOW player
+	}
+
+	public void drawForeground(Graphics2D g2) {
+	    draw(g2, true); // Draw all tiles ABOVE player
+	}
+	
+	public void draw(Graphics2D g2, boolean drawAbove) {
 		
 		int worldCol = 0;
 		int worldRow = 0;
@@ -111,8 +119,9 @@ public class TileManager {
 			   worldY + gp.getTileSize() > gp.player.worldY - gp.player.screenY &&
 			   worldY - gp.getTileSize() < gp.player.worldY + gp.player.screenY) {
 				
-				g2.drawImage(tile[tileNum].image, screenX, screenY, gp.getTileSize(), gp.getTileSize(), null);
-				
+	            if (tile[tileNum].isPlayerAbove() == drawAbove) {
+	                g2.drawImage(tile[tileNum].image, screenX, screenY, gp.getTileSize(), gp.getTileSize(), null);
+	            }				
 			}
 				
 			

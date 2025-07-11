@@ -1,0 +1,5 @@
+index,imagePath,isCollision,isPlayerAbove
+2,/tiles/0wallTile.png,true,true
+0,/tiles/5Grass.png,false,false
+1,/tiles/7Tree.png,true,true
+3,/tiles/8WoodenFloor.png,false,false

@@ -113,7 +113,7 @@ public class Player extends Entity {
     private void updateVerticalOffset() {
         if ("down".equals(direction)) {
             applyVerticalOffset = true;
-        } else if (("left".equals(direction) || "right".equals(direction)) && applyVerticalOffset) {
+        } else if (("left".equals(direction) || "right".equals(direction)) && applyVerticalOffset && gp.cChecker.isPlayerBehindObject(direction)) {
             // keep offset if previously applied
         } else {
             applyVerticalOffset = false;

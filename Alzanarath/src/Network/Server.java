@@ -133,6 +133,7 @@ public class Server {
                 System.err.println("Client disconnected: " + clientId);
             } finally {
                 server.removeClient(this);
+                
                 try {
                     socket.close();
                 } catch (IOException e) {
@@ -140,6 +141,26 @@ public class Server {
                 }
             }
         }
+        
+        public void removeClient(ClientHandler handler) {
+            synchronized (clients) {
+                clients.remove(handler);
+            }
+
+            // Remove from GamePanel remotePlayers
+            if (gamePanel != null) {
+                gamePanel.removeRemotePlayer(handler.getClientId());
+            }
+
+            // Remove from internal server player state tracking
+            playerStates.remove(handler.getClientId());
+
+            // Notify other clients about the disconnection
+            broadcast("PLAYER_LEFT:" + handler.getClientId());
+
+            System.out.println("Removed player: " + handler.getClientId());
+        }
+
         
         private void handleNetworkMessage(String message) {
             System.out.println("Server received: " + message);
@@ -169,6 +190,8 @@ public class Server {
                 e.printStackTrace();
             }
         }
+        
+        
         
      // Modify the handleConnect method:
         private void handleConnect(String data) {
